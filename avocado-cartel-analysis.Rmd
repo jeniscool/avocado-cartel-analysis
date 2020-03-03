@@ -6,21 +6,76 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(tidyverse)
+
 ```
 
 ## Importing Data
 
-```{r cars}
-# Import all the data here
-summary(cars)
+```{r}
+# Need to have package magrittr checked and downloaded
+
+tblDisplaced <-
+  read_csv('./data/displaced-persons-mexico/displaced-persons-by-region.csv')
+
+tblOpiods<-
+  read_csv('./data/opioid-crisis-by-interpersonal-relationships/Master_Table_Long.csv')
+
+tblHomicidesFemale<-
+  read_csv('./data/homicides-female/intentional-homicides-female.csv')
+
+tblHomicidesMale<-
+  read_csv('./data/homicides-male/intentional-homicides-male.csv')
+
+tblAvocado<-
+  read_csv('./data/avocado.csv')
 ```
 
-## Including Plots
+Graphing Displaced
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+tblDisplacedClean <- filter(tblDisplaced,  Country_Code  == 'MEX')
+y <- select(tblDisplacedClean, 'Country_Code','2009':'2018')
+df2 <- data.frame(t(y[-1]))
+colnames(df2) <- y[, 1]
+plotDisplaced<- ggplot(data = df2, x = 2009:2018, y = df2$'MEX') + geom_point(aes(x = 2009:2018, y = df2$'MEX')) + labs(x = 'years', y = 'number displaced')
+plotDisplaced
+#Used https://stackoverflow.com/questions/33643181/how-do-i-flip-rows-and-columns-in-r/33643244
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Graphing Opiods
+
+```{r}
+#Filtering data to find total deaths per each category. This isn't filtering to just these demographics, it's just pulling the total for each overall group. 
+tblOpiodsClean<- filter(tblOpiods, EducationType == 'Less Than HS' & CommuteType == 'Alone' & GDPType == 'All industry total')
+y<- select(tblOpiodsClean,'Year','Type','CountByType')
+y[is.na(y)] <- 0
+y<- filter(y, Type != 0)
+y<-y %>%
+    group_by(Year,Type) %>% 
+    summarise_each(funs(sum))
+yHeroin<- filter(y, Type == 'Heroin')
+yOther<- filter(y, Type == 'Other Opiod')
+yHeroin
+plotOpiods<- ggplot(data = yHeroin, aes(x = 2011:2017, y = yHeroin$CountByType)) + geom_point(aes(x = 2011:2017, y = yHeroin$CountByType), color = 'blue') + geom_point(data = yOther, aes(x = 2011:2017, y = yOther$CountByType, color = 'red')) + labs(x = 'years', y = 'total deaths')
+plotOpiods
+
+#Used https://stackoverflow.com/questions/8161836/how-do-i-replace-na-values-with-zeros-in-an-r-dataframe
+#https://stackoverflow.com/questions/34523679/aggregate-multiple-columns-at-once
+```
+
+Graphing Avocados
+
+```{r}
+tblAvocadoClean<- select(tblAvocado, 'Date','AveragePrice')
+y<-tblAvocadoClean %>%
+    group_by(Date) %>% 
+    summarise_each(funs(mean))
+plotAvocado<- ggplot(y, aes(x = y$Date, y = y$AveragePrice)) + geom_jitter(aes(x = y$Date, y = y$AveragePrice))
+plotAvocado
+
+```
+
+
+
