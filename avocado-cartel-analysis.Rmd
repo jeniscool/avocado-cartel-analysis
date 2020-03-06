@@ -13,7 +13,7 @@ library(tidyverse)
 
 ## Importing Data
 
-```{r}
+```{r echo = True, message = FALSE, warning = FALSE}
 # Need to have package magrittr checked and downloaded
 
 tblDisplaced <-
@@ -37,9 +37,14 @@ Graphing Displaced
 ```{r}
 tblDisplacedClean <- filter(tblDisplaced,  Country_Code  == 'MEX')
 y <- select(tblDisplacedClean, 'Country_Code','2009':'2018')
-df2 <- data.frame(t(y[-1]))
-colnames(df2) <- y[, 1]
-plotDisplaced<- ggplot(data = df2, x = 2009:2018, y = df2$'MEX') + geom_point(aes(x = 2009:2018, y = df2$'MEX')) + labs(x = 'years', y = 'number displaced')
+disp <- data.frame(c(2009:2018), t(y[-1]))
+colnames(disp) <- c('Date', y[, 1])
+
+# Find the coefficients for line best fit
+b<-lm(MEX~c(2009:2018),disp)$coefficients[1]
+m<-lm(MEX~c(2009:2018),disp)$coefficients[2]
+
+plotDisplaced<- ggplot(data = disp, x = 2009:2018, y = disp$'MEX') + geom_point(aes(x = 2009:2018, y = disp$'MEX')) + ggtitle('Displaced Persons in Mexico 2009-2018') + labs(x = 'years', y = 'number displaced') + geom_abline(aes(slope= m, intercept=b), color="orange") 
 plotDisplaced
 #Used https://stackoverflow.com/questions/33643181/how-do-i-flip-rows-and-columns-in-r/33643244
 ```
@@ -48,7 +53,8 @@ Graphing Opiods
 
 ```{r}
 #Filtering data to find total deaths per each category. This isn't filtering to just these demographics, it's just pulling the total for each overall group. 
-tblOpiodsClean<- filter(tblOpiods, EducationType == 'Less Than HS' & CommuteType == 'Alone' & GDPType == 'All industry total')
+#tblOpiodsClean<- filter(tblOpiods, EducationType == 'Less Than HS' & CommuteType == 'Alone' & GDPType == 'All industry total')
+tblOpiodsClean<- filter(tblOpiods, CommuteType == 'Alone' & GDPType == 'All industry total')
 y<- select(tblOpiodsClean,'Year','Type','CountByType')
 y[is.na(y)] <- 0
 y<- filter(y, Type != 0)
@@ -58,8 +64,12 @@ y<-y %>%
 yHeroin<- filter(y, Type == 'Heroin')
 yOther<- filter(y, Type == 'Other Opiod')
 yHeroin
-plotOpiods<- ggplot(data = yHeroin, aes(x = 2011:2017, y = yHeroin$CountByType)) + geom_point(aes(x = 2011:2017, y = yHeroin$CountByType), color = 'blue') + geom_point(data = yOther, aes(x = 2011:2017, y = yOther$CountByType, color = 'red')) + labs(x = 'years', y = 'total deaths')
+plotOpiods<- ggplot(data = yHeroin, aes(x = 2011:2017, y = yHeroin$CountByType)) + geom_point(aes(x = 2011:2017, y = yHeroin$CountByType, color = 'blue')) 
+plotOpiods <- plotOpiods + geom_point(data = yOther, aes(x = 2011:2017, y = yOther$CountByType, color = 'red')) + labs(x = 'years', y = 'total deaths') 
+# Adding Legend
+plotOpiods <- plotOpiods + scale_color_manual(labels = c("Heroin", "Other Opiods"), values = c("blue", "red"))
 plotOpiods
+
 
 #Used https://stackoverflow.com/questions/8161836/how-do-i-replace-na-values-with-zeros-in-an-r-dataframe
 #https://stackoverflow.com/questions/34523679/aggregate-multiple-columns-at-once
@@ -69,13 +79,85 @@ Graphing Avocados
 
 ```{r}
 tblAvocadoClean<- select(tblAvocado, 'Date','AveragePrice')
-y<-tblAvocadoClean %>%
+y<-data.frame(tblAvocadoClean %>%
     group_by(Date) %>% 
-    summarise_each(funs(mean))
+    summarise_each(funs(mean)))
 plotAvocado<- ggplot(y, aes(x = y$Date, y = y$AveragePrice)) + geom_jitter(aes(x = y$Date, y = y$AveragePrice))
 plotAvocado
 
+curr_year <- 2015
+years <- c(2015)
+avg_prices <- c()
+prices <- c()
+# Group avacado data by year
+for (i in 1:nrow(y)) {
+  row <- y[i, ]
+  if (as.integer(substring(row$Date, 1, 4)) == curr_year) {
+    prices <- c(prices, row$AveragePrice)
+  } else {
+    curr_year <- curr_year + 1
+    years <- c(years, curr_year)
+    avg_prices <- c(avg_prices, mean(prices))
+  }
+}
+# Catch the last one
+avg_prices <- c(avg_prices, mean(prices))
+
+avocados_annual <- data.frame(years, avg_prices)
+colnames(avocados_annual) <- names(y)
+
+# Much less exciting but may be useful for the data we only have on years
+plotAvocado_ann<- ggplot(avocados_annual, aes(x = avocados_annual$Date, y = avocados_annual$AveragePrice)) + geom_point()
+plotAvocado_ann
 ```
 
+
+Graphing Homocides Female
+
+```{r}
+tblHomicidesFemaleClean <- filter(tblHomicidesFemale,  Country_Code  == 'MEX')
+y <- select(tblHomicidesFemaleClean, 'Country_Code','2009':'2018')
+hom.f <- data.frame(c(2009:2018), t(y[-1]))
+colnames(hom.f) <- c('Year', y[, 1])
+
+# Find the coefficients for line best fit
+b<-lm(MEX~c(2009:2018),hom.f)$coefficients[1]
+m<-lm(MEX~c(2009:2018),hom.f)$coefficients[2]
+
+plotDisplaced<- ggplot(data = hom.f, x = 2009:2018, y = hom.f$'MEX') + geom_point(aes(x = 2009:2018, y = hom.f$'MEX')) + ggtitle('Female Homicides Mexico 2009-2018') + labs(x = 'years', y = 'Intentional homicides, female (per 100,000 female)') + geom_abline(aes(slope= m, intercept=b), color="orange") 
+plotDisplaced
+
+```
+
+
+
+Graphing Homocides Male
+
+```{r}
+tblHomicidesMaleClean <- filter(tblHomicidesMale,  Country_Code  == 'MEX')
+y <- select(tblHomicidesMaleClean, 'Country_Code','2009':'2018')
+hom.m <- data.frame(c(2009:2018), t(y[-1]))
+colnames(hom.m) <- c('Year', y[, 1])
+
+# Find the coefficients for line best fit
+b<-lm(MEX~c(2009:2018),hom.m)$coefficients[1]
+m<-lm(MEX~c(2009:2018),hom.m)$coefficients[2]
+
+plotDisplaced<- ggplot(data = hom.m, x = 2009:2018, y = hom.m$'MEX') + geom_point(aes(x = 2009:2018, y = hom.m$'MEX')) + ggtitle('Male Homicides Mexico 2009-2018') + labs(x = 'years', y = 'Intentional homicides, male (per 100,000 male)') + geom_abline(aes(slope= m, intercept=b), color="orange") 
+plotDisplaced
+
+```
+
+
+```{r}
+# Add 2018 NA to missing datasets
+yHeroin[nrow(yHeroin)+1,] <- c(2018, 'Heroin', NA)
+yOther[nrow(yOther)+1,] <- c(2018, 'Other Opiod', NA)
+
+
+master_data <- data.frame(avocados_annual$Date, avocados_annual$AveragePrice, subset(disp, Date %in% c(2015:2018))$MEX, subset(yHeroin, Year %in% c(2015:2018))$CountByType, subset(yOther, Year %in% c(2015:2018))$CountByType, subset(hom.f, Year %in% c(2015:2018))$MEX, subset(hom.m, Year %in% c(2015:2018))$MEX)
+colnames(master_data) <- c('year', 'avocado_prices', 'displaced_persons', 'heroin', 'other_opiods', 'female_homicides', 'male_homicides')
+master_data
+````
 
 
