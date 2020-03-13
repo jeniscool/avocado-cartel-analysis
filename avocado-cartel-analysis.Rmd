@@ -1,6 +1,6 @@
 ---
 title: "avocado-cartel-analysis"
-author: "Dorothy David & Jen Lee"
+author: "Dorothy Davis & Jen Lee"
 output: html_document
 ---
 
@@ -8,6 +8,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(data.table)
 library(tidyverse)
+library(lubridate)
 
 ```
 
@@ -22,11 +23,17 @@ tblDisplaced <-
 tblOpiods<-
   read_csv('./data/opioid-crisis-by-interpersonal-relationships/Master_Table_Long.csv')
 
+tblOpiods2<- 
+  read_csv('./data/VSRR_Provisional_Drug_Overdose_Death_Counts.csv')
+
 tblHomicidesFemale<-
   read_csv('./data/homicides-female/intentional-homicides-female.csv')
 
 tblHomicidesMale<-
   read_csv('./data/homicides-male/intentional-homicides-male.csv')
+
+tblHomicidesMexico<-
+  read_csv('./data/homicides-mexico.csv')
 
 tblAvocado<-
   read_csv('./data/avocado.csv')
@@ -35,6 +42,7 @@ tblAvocado<-
 Graphing Displaced
 
 ```{r}
+
 tblDisplacedClean <- filter(tblDisplaced,  Country_Code  == 'MEX')
 y <- select(tblDisplacedClean, 'Country_Code','2009':'2018')
 disp <- data.frame(c(2009:2018), t(y[-1]))
@@ -75,6 +83,37 @@ plotOpiods
 #https://stackoverflow.com/questions/34523679/aggregate-multiple-columns-at-once
 ```
 
+Graphing Opiods from CDC Data Source
+```{r}
+tblOpiodsClean2<- filter(tblOpiods2, Indicator == 'Heroin (T40.1)' | Indicator == 'Natural & semi-synthetic opioids (T40.2)' | Indicator == 'Opioids (T40.0-T40.4,T40.6)' | Indicator == 'Natural & semi-synthetic opioids, incl. methadone (T40.2, T40.3)' | Indicator == 'Natural, semi-synthetic, & synthetic opioids, incl. methadone (T40.2-T40.4)')
+
+y<- data.frame(select(tblOpiodsClean2, 'State', 'Year', 'Month', 'Indicator', 'Data_Value'))
+y[is.na(y)] <- 0
+
+y_temp <- y[which(y$State == 'US'), ]
+#y_temp <- y
+
+y_temp <- cbind(y_temp, date=rep(NA, nrow(y_temp)))
+
+for (i in 1:length(y_temp)) {
+  y_temp[i]$date = parse_date(paste(y_temp$Year, y_temp$Month, sep="-"), format='%Y-%B')
+  #print(parse_date(paste(y_temp$Year, y_temp$Month, sep="-"), format='%Y-%B'))
+}
+
+yHeroin2<-filter(y_temp, Indicator == 'Heroin (T40.1)')
+yOpiods2<-filter(y_temp, Indicator == 'Opioids (T40.0-T40.4,T40.6)')
+
+
+plotOpiods2<- ggplot(data = yHeroin2, aes(x = yHeroin2$date, y = yHeroin2$Data_Value)) + geom_point(aes(x = yHeroin2$date, y = yHeroin2$Data_Value, color = 'blue')) 
+#plotOpiods2 <- plotOpiods2 + geom_point(data = yOpiods2, aes(x = yOpiods2$date, y = yOpiods2$Data_Value, color = 'red')) + labs(x = 'years', y = 'total deaths') 
+# Adding Legend
+#plotOpiods2 <- plotOpiods2 + scale_color_manual(labels = c("Heroin", "Other Opiods"), values = c("blue", "red"))
+plotOpiods2
+
+```
+
+
+
 Graphing Avocados
 
 ```{r}
@@ -111,6 +150,68 @@ plotAvocado_ann<- ggplot(avocados_annual, aes(x = avocados_annual$Date, y = avoc
 plotAvocado_ann
 ```
 
+
+Graphing Avocados With New Data
+
+```{r echo = True, message = FALSE, warning = FALSE}
+tblAvocadoNew<-
+  read_csv('./data/avocado_complete.csv')
+tblAvocadoNew$Date<-as.Date(tblAvocadoNew$Date)
+
+tblAvocadoNew$Organic[is.na(tblAvocadoNew$Organic)] <- 'N'
+tblAvocadoNew<-filter(tblAvocadoNew, Organic != 'Y' & Unit == 'each' & Variety == 'HASS' & Date > as.Date('2015-04-01') & Date < as.Date ('2019-07-01'))
+
+years<- year(tblAvocadoNew$Date)
+months<- month(tblAvocadoNew$Date)
+
+tblAvocadoNew$years<- years
+tblAvocadoNew$months<- months
+
+y<-data.frame(select(tblAvocadoNew, 'months', 'years', 'Weighted_Avg_Price') %>%
+    group_by(years, months) %>% 
+      summarise(mean = mean(Weighted_Avg_Price)))
+
+y$date<- seq.Date(as.Date('2015-04-01'),as.Date('2019-6-28'), by = 'month')
+
+g <- ggplot(data = y) + geom_point(aes(x = date, y = mean)) + geom_smooth(aes(x = date, y = mean))
+g
+
+
+#Below is annual graph just in case we still need it
+#avocadoPrices$years <- c(2008:2018)
+#avocadoPrices$prices<-tapply(tblAvocadoNew$Weighted_Avg_Price, years, mean)
+
+#g <- ggplot(data = avocadoPrices, aes(x=2008:2018)) + geom_point(aes(x = 2008:2018, y = avocadoPrices$prices))
+#g
+
+#https://stackoverflow.com/questions/27298593/reading-csv-file-in-r-and-formatting-dates-and-time-while-reading-and-avoiding-m
+#https://blog.exploratory.io/filter-with-date-function-ce8e84be680  
+#https://stackoverflow.com/questions/28143510/r-group-by-year
+```
+
+
+Graphing Homicides
+```{r}
+hom_temp <- data.frame(tblHomicidesMexico)
+hom <- NULL
+
+# Turn into a vertical data frame
+for (r in 1:nrow(hom_temp)) {
+  year <- hom_temp[r, 1]
+  for (m in 1:12) {
+    date <- paste(year, m, sep='-')
+    #UGH I'm not sure why the date is loading weird 
+    #hom <- data.frame(rbind(hom, c(date, hom_temp[r, m+2])))
+    hom <- data.frame(rbind(hom, c(parse_date(date, format='%Y-%m'), hom_temp[r, m+2])))
+  }
+}
+
+colnames(hom)<- c('Date', 'Homicides')
+
+plotHomicidesMexico <- ggplot(data = hom, x = hom$Date, y = hom$Homicides) + geom_point(aes(x = hom$Date, y = hom$Homicides))
+plotHomicidesMexico
+
+```
 
 Graphing Homocides Female
 
